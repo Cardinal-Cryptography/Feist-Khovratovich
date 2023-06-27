@@ -100,13 +100,7 @@ mod tests {
         (srs, srs_proj)
     }
 
-    #[test]
-    fn test_multipoint_commitment() {
-        let n = 64;
-
-        let mut rng = test_rng();
-        let poly = DensePolynomial::<Fr>::rand(n, &mut rng);
-
+    fn test(poly: DensePolynomial<Fr>, n: usize) {
         let domain = GeneralEvaluationDomain::<Fr>::new(n).unwrap();
         let (srs, srs_proj) = srs(n);
 
@@ -116,18 +110,17 @@ mod tests {
     }
 
     #[test]
+    fn test_multipoint_commitment() {
+        let n = 64;
+        let poly = DensePolynomial::<Fr>::rand(n, &mut test_rng());
+        test(poly, n);
+    }
+
+    #[test]
     fn test_smaller_degree() {
         let n = 32;
         let d = 5;
-
-        let mut rng = test_rng();
-        let poly = DensePolynomial::<Fr>::rand(d, &mut rng);
-
-        let domain = GeneralEvaluationDomain::<Fr>::new(n).unwrap();
-        let (srs, srs_proj) = srs(n);
-
-        let qs_fast = fk_classic(&srs_proj, &poly, &domain);
-        let qs_slow = commit_in_each_omega_i::<Bn254>(&srs, &domain, &poly);
-        assert_eq!(qs_fast, qs_slow);
+        let poly = DensePolynomial::<Fr>::rand(d, &mut test_rng());
+        test(poly, n);
     }
 }
