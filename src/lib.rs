@@ -8,17 +8,24 @@ use ark_poly::univariate::DensePolynomial;
 pub use utils::*;
 use crate::toeplitz::UpperToeplitz;
 
-pub fn fk_classic(srs: &[G1Projective], poly: &DensePolynomial<Fr>, domain: &GeneralEvaluationDomain<Fr>) -> Vec<G1Projective> {
-    let d = poly.degree();
-    let d_cap = next_pow2(d);
+pub trait FK {
+    fn fk(srs: &[G1Projective], poly: &DensePolynomial<Fr>, domain: &GeneralEvaluationDomain<Fr>) -> Vec<G1Projective>;
+}
 
-    let toeplitz = UpperToeplitz::from_poly(poly);
+pub enum ClassicFk {}
+impl FK for ClassicFk {
+    fn fk(srs: &[G1Projective], poly: &DensePolynomial<Fr>, domain: &GeneralEvaluationDomain<Fr>) -> Vec<G1Projective> {
+        let d = poly.degree();
+        let d_cap = next_pow2(d);
 
-    let mut srs = srs[..d_cap].to_vec();
-    srs.reverse();
-    let h_commitments = &toeplitz.mul_by_vec(&srs)[..d_cap];
+        let toeplitz = UpperToeplitz::from_poly(poly);
 
-    domain.fft(h_commitments)
+        let mut srs = srs[..d_cap].to_vec();
+        srs.reverse();
+        let h_commitments = &toeplitz.mul_by_vec(&srs)[..d_cap];
+
+        domain.fft(h_commitments)
+    }
 }
 
 #[cfg(test)]
@@ -34,7 +41,7 @@ mod tests {
     };
     use ark_std::test_rng;
 
-    use crate::{fk_classic};
+    use crate::{ClassicFk, FK};
 
     pub fn commit<E: PairingEngine>(
         srs: &[E::G1Affine],
@@ -100,11 +107,11 @@ mod tests {
         (srs, srs_proj)
     }
 
-    fn test(poly: DensePolynomial<Fr>, n: usize) {
+    fn test<FKEngine: FK>(poly: DensePolynomial<Fr>, n: usize) {
         let domain = GeneralEvaluationDomain::<Fr>::new(n).unwrap();
         let (srs, srs_proj) = srs(n);
 
-        let qs_fast = fk_classic(&srs_proj, &poly, &domain);
+        let qs_fast = FKEngine::fk(&srs_proj, &poly, &domain);
         let qs_slow = commit_in_each_omega_i::<Bn254>(&srs, &domain, &poly);
         assert_eq!(qs_fast, qs_slow);
     }
@@ -113,7 +120,7 @@ mod tests {
     fn test_multipoint_commitment() {
         let n = 64;
         let poly = DensePolynomial::<Fr>::rand(n, &mut test_rng());
-        test(poly, n);
+        test::<ClassicFk>(poly, n);
     }
 
     #[test]
@@ -121,6 +128,6 @@ mod tests {
         let n = 32;
         let d = 5;
         let poly = DensePolynomial::<Fr>::rand(d, &mut test_rng());
-        test(poly, n);
+        test::<ClassicFk>(poly, n);
     }
 }
