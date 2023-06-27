@@ -6,12 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ark-bn254 = "0.3.0"
-ark-ff = "0.3.0"
-ndarray = "0.15.6"
-ark-poly = "0.3.0"
-ark-ec = "0.3.0"
-ark-std = "0.3.0"
-
-[dev-dependencies]
-ndarray = "0.15.6"
+ark-bn254 = { version = "0.3.0" }
+ark-ff = { version = "0.3.0", features = ["parallel"] }
+ndarray = { version = "0.15.6" }
+ark-poly = { version = "0.3.0", features = ["parallel"] }
+ark-ec = { version = "0.3.0", features = ["parallel"] }
+ark-std = { version = "0.3.0", features = ["parallel"] }

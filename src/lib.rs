@@ -2,22 +2,30 @@ mod circulant;
 mod toeplitz;
 mod utils;
 
+use crate::toeplitz::UpperToeplitz;
 use ark_bn254::{Fr, G1Affine, G1Projective};
 use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{One};
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial};
+use ark_ff::One;
 use ark_poly::univariate::DensePolynomial;
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial};
 pub use utils::*;
-use crate::toeplitz::UpperToeplitz;
 
 pub trait FK {
-    fn fk(srs: &SRS, poly: &DensePolynomial<Fr>, domain: &GeneralEvaluationDomain<Fr>) -> Vec<G1Projective>;
+    fn fk(
+        srs: &SRS,
+        poly: &DensePolynomial<Fr>,
+        domain: &GeneralEvaluationDomain<Fr>,
+    ) -> Vec<G1Projective>;
 }
 
 pub enum ClassicFk {}
 
 impl FK for ClassicFk {
-    fn fk(srs: &SRS, poly: &DensePolynomial<Fr>, domain: &GeneralEvaluationDomain<Fr>) -> Vec<G1Projective> {
+    fn fk(
+        srs: &SRS,
+        poly: &DensePolynomial<Fr>,
+        domain: &GeneralEvaluationDomain<Fr>,
+    ) -> Vec<G1Projective> {
         let d = poly.degree();
         let d_cap = next_pow2(d);
 
@@ -34,9 +42,13 @@ impl FK for ClassicFk {
 pub enum CqLinFk {}
 
 impl FK for CqLinFk {
-    fn fk(srs: &SRS, poly: &DensePolynomial<Fr>, domain: &GeneralEvaluationDomain<Fr>) -> Vec<G1Projective> {
+    fn fk(
+        srs: &SRS,
+        poly: &DensePolynomial<Fr>,
+        domain: &GeneralEvaluationDomain<Fr>,
+    ) -> Vec<G1Projective> {
         let n = domain.size();
-        let aux_domain = GeneralEvaluationDomain::<Fr>::new(2*n).unwrap();
+        let aux_domain = GeneralEvaluationDomain::<Fr>::new(2 * n).unwrap();
 
         ///////////////////////////////////////////////////////////////
         ///// Computing srs*
@@ -56,8 +68,7 @@ impl FK for CqLinFk {
         let g1_gen = G1Affine::prime_subgroup_generator();
 
         // srs* is just the embedding of T's evaluations via `g1_gen`
-        let srs_star = t_evals.iter()
-            .map(|t| g1_gen.mul(*t).into_affine());
+        let srs_star = t_evals.iter().map(|t| g1_gen.mul(*t).into_affine());
 
         ///////////////////////////////////////////////////////////////
         ///// Computing {[D·T]}
@@ -88,6 +99,7 @@ pub struct SRS {
 #[cfg(test)]
 mod tests {
     use std::iter;
+    use std::time::Instant;
 
     use ark_bn254::{Bn254, Fr, G1Affine, G1Projective};
     use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine};
@@ -157,10 +169,7 @@ mod tests {
             .take(n)
             .map(|tp| g1_gen.mul(tp.into_repr()).into())
             .collect();
-        let srs_proj: Vec<G1Projective> = srs
-            .iter()
-            .map(|t| t.into_projective())
-            .collect();
+        let srs_proj: Vec<G1Projective> = srs.iter().map(|t| t.into_projective()).collect();
         SRS {
             tau,
             affine: srs,
@@ -192,5 +201,27 @@ mod tests {
         let poly = DensePolynomial::<Fr>::rand(d, &mut test_rng());
         test::<ClassicFk>(poly.clone(), n);
         test::<CqLinFk>(poly, n);
+    }
+
+    #[test]
+    fn test_large_domain() {
+        let n = 1024 * 32;
+        let poly = DensePolynomial::<Fr>::rand(n, &mut test_rng());
+        let domain = GeneralEvaluationDomain::<Fr>::new(n).unwrap();
+        let srs = srs(n);
+
+        let now = Instant::now();
+        let classic = ClassicFk::fk(&srs, &poly, &domain);
+        let elapsed = Instant::elapsed(&now);
+
+        println!("Classic approach took: {}ms", elapsed.as_millis());
+
+        let now = Instant::now();
+        let cqlin = CqLinFk::fk(&srs, &poly, &domain);
+        let elapsed = Instant::elapsed(&now);
+
+        println!("CqLin approach took: {}ms", elapsed.as_millis());
+
+        assert_eq!(classic, cqlin);
     }
 }
